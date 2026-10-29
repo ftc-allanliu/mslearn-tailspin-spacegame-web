@@ -1,9 +1,10 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using TailSpin.SpaceGame.Web.Models;
 
 namespace TailSpin.SpaceGame.Web.Controllers
@@ -13,15 +14,19 @@ namespace TailSpin.SpaceGame.Web.Controllers
         // High score repository.
         private readonly IDocumentDBRepository<Score> _scoreRepository;
         // User profile repository.
-        private readonly IDocumentDBRepository<Profile> _profileRespository;
+        private readonly IDocumentDBRepository<Profile> _profileRepository;
+        // Logger instance.
+        private readonly ILogger<HomeController> _logger;
 
         public HomeController(
             IDocumentDBRepository<Score> scoreRepository,
-            IDocumentDBRepository<Profile> profileRespository
+            IDocumentDBRepository<Profile> profileRepository,
+            ILogger<HomeController> logger
             )
         {
             _scoreRepository = scoreRepository;
-            _profileRespository = profileRespository;
+            _profileRepository = profileRepository;
+            _logger = logger;
         }
 
         public async Task<IActionResult> Index(
@@ -31,6 +36,10 @@ namespace TailSpin.SpaceGame.Web.Controllers
             string region = ""
             )
         {
+            // Sanitize and validate pagination parameters
+            page = Math.Max(1, page);
+            pageSize = (pageSize < 1 || pageSize > 100) ? 10 : pageSize;
+
             // Create the view model with initial values we already know.
             var vm = new LeaderboardViewModel
             {
@@ -38,6 +47,7 @@ namespace TailSpin.SpaceGame.Web.Controllers
                 PageSize = pageSize,
                 SelectedMode = mode,
                 SelectedRegion = region,
+                Scores = Enumerable.Empty<ScoreProfile>(),
 
                 GameModes = new List<string>()
                 {
@@ -82,29 +92,25 @@ namespace TailSpin.SpaceGame.Web.Controllers
                 // Set previous and next hyperlinks.
                 if (page > 1)
                 {
-                    vm.PrevLink = $"/?page={page - 1}&pageSize={pageSize}&mode={mode}&region={region}#leaderboard";
+                    vm.PrevLink = $"/?page={page - 1}&pageSize={pageSize}&mode={Uri.EscapeDataString(mode ?? "")}&region={Uri.EscapeDataString(region ?? "")}#leaderboard";
                 }
                 if (vm.TotalResults > page * pageSize)
                 {
-                    vm.NextLink = $"/?page={page + 1}&pageSize={pageSize}&mode={mode}&region={region}#leaderboard";
+                    vm.NextLink = $"/?page={page + 1}&pageSize={pageSize}&mode={Uri.EscapeDataString(mode ?? "")}&region={Uri.EscapeDataString(region ?? "")}#leaderboard";
                 }
 
-                // Fetch the user profile for each score.
-                // This creates a list that's parallel with the scores collection.
-                var profiles = new List<Task<Profile>>();
-                foreach (var score in scores)
-                {
-                    profiles.Add(_profileRespository.GetItemAsync(score.ProfileId));
-                }
-                Task<Profile>.WaitAll(profiles.ToArray());
+                // Fetch the user profile for each score asynchronously without blocking thread pool threads.
+                var profileTasks = scores.Select(score => _profileRepository.GetItemAsync(score.ProfileId));
+                var profiles = await Task.WhenAll(profileTasks);
 
                 // Combine each score with its profile.
-                vm.Scores = scores.Zip(profiles, (score, profile) => new ScoreProfile { Score = score, Profile = profile.Result });
+                vm.Scores = scores.Zip(profiles, (score, profile) => new ScoreProfile { Score = score, Profile = profile });
 
                 return View(vm);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "An error occurred while loading the leaderboard.");
                 return View(vm);
             }
         }
@@ -115,11 +121,18 @@ namespace TailSpin.SpaceGame.Web.Controllers
             try
             {
                 // Fetch the user profile with the given identifier.
-                return View(new ProfileViewModel { Profile = await _profileRespository.GetItemAsync(id), Rank = rank });
+                var profile = await _profileRepository.GetItemAsync(id);
+                if (profile == null)
+                {
+                    return NotFound();
+                }
+
+                return View(new ProfileViewModel { Profile = profile, Rank = rank });
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                return RedirectToAction("/");
+                _logger.LogError(ex, "An error occurred while retrieving profile for ID: {ProfileId}", id);
+                return RedirectToAction(nameof(Index));
             }
         }
 

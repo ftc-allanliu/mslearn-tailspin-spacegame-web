@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -19,17 +19,23 @@ namespace TailSpin.SpaceGame.Web
             _items = JsonSerializer.Deserialize<List<T>>(File.ReadAllText(fileName));
         }
 
+        public LocalDocumentDBRepository(Stream stream)
+        {
+            using var reader = new StreamReader(stream);
+            _items = JsonSerializer.Deserialize<List<T>>(reader.ReadToEnd());
+        }
+
         /// <summary>
         /// Retrieves the item from the store with the given identifier.
         /// </summary>
         /// <returns>
         /// A task that represents the asynchronous operation.
-        /// The task result contains the retrieved item.
+        /// The task result contains the retrieved item or null if not found.
         /// </returns>
         /// <param name="id">The identifier of the item to retrieve.</param>
         public Task<T> GetItemAsync(string id)
         {
-            return Task<T>.FromResult(_items.Single(item => item.Id == id));
+            return Task<T>.FromResult(_items.FirstOrDefault(item => item.Id == id));
         }
 
         /// <summary>
@@ -42,19 +48,22 @@ namespace TailSpin.SpaceGame.Web
         /// </returns>
         /// <param name="queryPredicate">Predicate that specifies which items to select.</param>
         /// <param name="orderDescendingPredicate">Predicate that specifies how to sort the results in descending order.</param>
-        /// <param name="page">The 1-based page of results to return.</param>
+        /// <param name="page">The 0-based page index of results to return.</param>
         /// <param name="pageSize">The number of items on a page.</param>
         public Task<IEnumerable<T>> GetItemsAsync(
             Func<T, bool> queryPredicate,
             Func<T, int> orderDescendingPredicate,
-            int page = 1, int pageSize = 10
+            int page = 0, int pageSize = 10
         )
         {
+            var skipCount = Math.Max(0, page * Math.Max(0, pageSize));
+            var takeCount = Math.Max(0, pageSize);
+
             var result = _items
                 .Where(queryPredicate) // filter
                 .OrderByDescending(orderDescendingPredicate) // sort
-                .Skip(page * pageSize) // find page
-                .Take(pageSize); // take items
+                .Skip(skipCount) // find page
+                .Take(takeCount); // take items
 
             return Task<IEnumerable<T>>.FromResult(result);
         }
@@ -69,9 +78,7 @@ namespace TailSpin.SpaceGame.Web
         /// <param name="queryPredicate">Predicate that specifies which items to select.</param>
         public Task<int> CountItemsAsync(Func<T, bool> queryPredicate)
         {
-            var count = _items
-                .Where(queryPredicate) // filter
-                .Count(); // count
+            var count = _items.Count(queryPredicate);
 
             return Task<int>.FromResult(count);
         }
