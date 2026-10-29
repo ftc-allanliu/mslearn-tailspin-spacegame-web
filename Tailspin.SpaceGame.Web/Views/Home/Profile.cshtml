@@ -1,6 +1,6 @@
-﻿@model TailSpin.SpaceGame.Web.Models.ProfileViewModel
+@model TailSpin.SpaceGame.Web.Models.ProfileViewModel
 @{
-    ViewData["Title"] = "@Model.Profile.UserName Profile";
+    ViewData["Title"] = $"{Model.Profile?.UserName} Profile";
 }
 <div class="modal fade profile" id="profile-modal-@Model.Rank" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
     <div class="modal-dialog" role="document">
@@ -12,18 +12,21 @@
                 <div class="row">
                     <div class="col-sm-4">
                         <div class="avatar">
-                            <div style="background-image:url('@Model.Profile.AvatarUrl');"></div>
+                            <div style="background-image:url('@Model.Profile?.AvatarUrl');"></div>
                         </div>
                     </div>
                     <div class="col-sm-8">
                         <div class="content">
-                            <h1>@Model.Profile.UserName</h1>
+                            <h1>@Model.Profile?.UserName</h1>
                             <b>Rank #@Model.Rank</b>
                             <h2>Achievements</h2>
                             <ul>
-                                @foreach (var achievement in Model.Profile.Achievements)
+                                @if (Model.Profile?.Achievements != null)
                                 {
-                                    <li>@achievement</li>
+                                    @foreach (var achievement in Model.Profile.Achievements)
+                                    {
+                                        <li>@achievement</li>
+                                    }
                                 }
                             </ul>
                         </div>

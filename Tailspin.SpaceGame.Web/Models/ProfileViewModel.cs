@@ -1,10 +1,10 @@
-﻿namespace TailSpin.SpaceGame.Web.Models
+namespace TailSpin.SpaceGame.Web.Models
 {
     public class ProfileViewModel
     {
         // The player profile.
-        public Profile Profile;
+        public Profile Profile { get; set; }
         // The player's rank according to the active filter.
-        public string Rank;
+        public string Rank { get; set; }
     }
 }

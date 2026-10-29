@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -13,7 +13,7 @@ namespace TailSpin.SpaceGame.Web
         /// </summary>
         /// <returns>
         /// A task that represents the asynchronous operation.
-        /// The task result contains the retrieved item.
+        /// The task result contains the retrieved item or null if not found.
         /// </returns>
         /// <param name="id">The identifier of the item to retrieve.</param>
         Task<T> GetItemAsync(string id);
@@ -28,12 +28,12 @@ namespace TailSpin.SpaceGame.Web
         /// </returns>
         /// <param name="queryPredicate">Predicate that specifies which items to select.</param>
         /// <param name="orderDescendingPredicate">Predicate that specifies how to sort the results in descending order.</param>
-        /// <param name="page">The 1-based page of results to return.</param>
+        /// <param name="page">The 0-based page index of results to return.</param>
         /// <param name="pageSize">The number of items on a page.</param>
         Task<IEnumerable<T>> GetItemsAsync(
             Func<T, bool> queryPredicate,
             Func<T, int> orderDescendingPredicate,
-            int page = 1,
+            int page = 0,
             int pageSize = 10
         );
 
